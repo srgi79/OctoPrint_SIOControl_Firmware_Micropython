@@ -1,4 +1,10 @@
 
+import logging
+
+# Config logger
+logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # GLOBAL UART1
 from machine import UART, Pin
 uart1 = UART(1, baudrate=115200, tx=Pin(4), rx=Pin(5), timeout=250)
@@ -14,11 +20,10 @@ reserved_gpios = [0, 1, 4, 5, 23, 24, 29]
 # GP25	User LED
 # GP29 / A3	VSYS Sense
 
-def set_led(state: bool):    
+def set_led(state: bool):
     led = Pin("LED", Pin.OUT)
     led.value(state)
-    print(f"DEBUG: Led set to {state}")
-
+    logger.info(f'Led set to {state}')
 
 def set_rgb(tup: tuple):
     from neopixel import NeoPixel
@@ -26,6 +31,7 @@ def set_rgb(tup: tuple):
     np = NeoPixel(Pin(23), 1)
     np[0] = tup
     np.write()
+    logger.info(f'RGB set to {tup}')
 
 
 def read_uart():
@@ -39,16 +45,17 @@ def read_uart():
         try:
             s = b.decode('utf-8')
             if s.endswith('\n'):
-                print(f"READ {s[:-1]}")
+                logger.debug(f'READ {s[:-1]}')
                 return s[:-1]
             else:
-                print(f"READ {s}")
-                s
+                logger.debug(f'READ {s}')
+                return s
             
         except:
             return ""
     else:
         return f""
+
 
 def switch_cmd(cmd):
     if cmd.startswith("EIO"): #Pause/End IO Status Auto reporting. This setting is not maintained through restarts of the device
@@ -82,20 +89,22 @@ def switch_cmd(cmd):
     else:
         return ["", "", ""]
 
+
 def send_ack():
     global uart1    
 
     uart1.write("OK\n")
+
 
 def write_uart(msg):
     global uart1        
 
     uart1.write(msg+"\n")
 
+
 def create_report():
     from machine import mem32
     global reserved_gpios
-    
     
     max_gpio = 29 #GP0 to GP29
     #GPIO0 to GPIO22 are digital only
@@ -115,22 +124,27 @@ def create_report():
     
     return msg
 
+
 def store_settings():
-    print("TODO")
+    logger.info(f'TODO')
+
 
 def set_io(pin_n: int, pin_state: bool):
     #from machine import Pin
     global reserved_gpios
     
     if pin_n in reserved_gpios:
-        print(f"DEBUG: Pin {pin_n} is reserved")
+        logger.warning(f'Pin {pin_n} is reserved')
     else:
         pin = Pin(pin_n, Pin.OUT)
         pin.value(pin_state)
-        print(f"DEBUG: Pin {pin_n} set to {pin_state}")
+        logger.info(f'Pin {pin_n} set to {pin_state}')
+
 
 def restart_board():
     from machine import soft_reset
     
-    print(f"DEBUG: Restarting")
+    logger.critical(f'Restarting')
     soft_reset()
+
+
