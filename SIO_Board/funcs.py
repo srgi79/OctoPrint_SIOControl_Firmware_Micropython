@@ -40,9 +40,11 @@ def read_uart():
             s = b.decode('utf-8')
             if s.endswith('\n'):
                 print(f"READ {s[:-1]}")
+                return s[:-1]
             else:
                 print(f"READ {s}")
-            return s
+                s
+            
         except:
             return ""
     else:
