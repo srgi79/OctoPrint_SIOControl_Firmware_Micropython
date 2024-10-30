@@ -10,7 +10,8 @@ from machine import UART, Pin
 uart1 = UART(1, baudrate=115200, tx=Pin(4), rx=Pin(5), timeout=250)
 
 # GLOBAL RESERVED GPIOS https://pico.pinout.xyz/
-reserved_gpios = [0, 1, 4, 5, 23, 24, 29]
+reserved_gpios = const(0b011110011111111111111111001100)
+reserved_gpios_list = [0, 1, 4, 5, 23, 24, 29]
 # GP00	UART0 TX
 # GP01	UART0 RX
 # GP04	UART1 TX
@@ -20,10 +21,14 @@ reserved_gpios = [0, 1, 4, 5, 23, 24, 29]
 # GP25	User LED
 # GP29 / A3	VSYS Sense
 
+# GLOBAL NEOPIXELS STATE
+np_on = False
+
 def set_led(state: bool):
     led = Pin("LED", Pin.OUT)
     led.value(state)
     logger.info(f'Led set to {state}')
+
 
 def set_rgb(tup: tuple):
     from neopixel import NeoPixel
@@ -32,6 +37,24 @@ def set_rgb(tup: tuple):
     np[0] = tup
     np.write()
     logger.info(f'RGB set to {tup}')
+
+
+def set_neopixel(pin: int, n: int, tup: tuple):
+    from neopixel import NeoPixel
+    global np_on
+    
+    np = NeoPixel(Pin(pin), n)
+    
+    np.fill(tup)
+    
+    np.write()
+    
+    if tup == (0,0,0):
+        np_on = False
+    else:
+        np_on = True
+        
+    logger.info(f'Neopixels set to {tup}')
 
 
 def read_uart():
@@ -67,7 +90,8 @@ def switch_cmd(cmd):
     elif cmd.startswith("IC"): #Returns the number of IO points being monitored
         return ["IC", "28", ""]
     elif cmd.startswith("CIO"): #Ex: CIO 1,1,1,1,5,5,5,5,5,5,5,2,2,2. 1:IN, 2:OUT, 5:IN_PULLUP, 9:IN_PULLDOWN, 18:OUT_OPEN_DRAIN, -2:OUT_PWN, -3:IN_DHT
-        return ["CIO", "2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,", ""]
+        temp = cmd.split()
+        return ["CIO", f"{temp[1]}", ""]
     elif cmd.startswith("SIO"): #Stores current IO point type settings to local storage
         return ["SIO", "", ""]
     elif cmd.startswith("IO"): #Sets an IO point. Ex: IO [#] [0/1]
@@ -104,36 +128,34 @@ def write_uart(msg):
 
 def create_report():
     from machine import mem32
-    global reserved_gpios
+    global reserved_gpios, np_on
     
-    max_gpio = 29 #GP0 to GP29
-    #GPIO0 to GPIO22 are digital only
-    #GPIO 26-28 are able to be used either as digital GPIO or as ADC inputs
+    # REGISTER ADDRS
+    SIO_BASE           = const(0xD0000000)
+    GPIO_IN            = const(SIO_BASE + 0x004)
     
-    msg = "IO:"
-    addrGP0Status= 0x40014000
+    # NEOPIXELS
+    NEO = 0b000000000001000000000000000000 if np_on else 0b0
     
-    for g in (range(max_gpio+1)): #Not reversed
-        if not g in reserved_gpios:
-            addrGPXStatus = g*0x08 + 0x40014000
-            reg = mem32[addrGPXStatus]
-            val = (reg >> 9) & 0x1
-            msg += f"{val}"
-        else:
-            msg += "0"
+    # Read gpios and mask reserved
+    gpios = '{0:029b}'.format(mem32[GPIO_IN] & reserved_gpios | NEO)
+        
+    # Reverse gpios string
+    rev_gpios = ""
+    for c in gpios:
+        rev_gpios = c + rev_gpios
+    
+    # Append suffix
+    msg = "IO:" + rev_gpios
+    print(msg)
     
     return msg
 
 
-def store_settings():
-    logger.info(f'TODO')
-
-
 def set_io(pin_n: int, pin_state: bool):
-    #from machine import Pin
-    global reserved_gpios
+    global reserved_gpios_list
     
-    if pin_n in reserved_gpios:
+    if pin_n in reserved_gpios_list:
         logger.warning(f'Pin {pin_n} is reserved')
     else:
         pin = Pin(pin_n, Pin.OUT)
@@ -146,5 +168,25 @@ def restart_board():
     
     logger.critical(f'Restarting')
     soft_reset()
+
+
+def store_config():
+    print(f'TODO')
+
+
+def read_config():
+    # REGISTER ADDRS
+    #SIO_BASE           = 0xD0000000
+    #GPIO_IN            = SIO_BASE + 0x004
+    #GPIO_OE_SET        = SIO_BASE + 0x024
+    
+    #mem32[GPIO_OE_SET]
+    #print(f"{mem32[GPIO_OE_SET]}")
+    print(f'TODO')
+
+
+def send_config():
+    print(f"TODO")
+
 
 

@@ -5,9 +5,9 @@ import logging # Install logging package
 logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from funcs import set_led, set_rgb, set_io, read_uart, write_uart, switch_cmd, send_ack, create_report, store_settings, restart_board
+# Import functions and libraries
+from funcs import set_led, set_rgb, set_io, read_uart, write_uart, switch_cmd, send_ack, create_report, restart_board, store_config, read_config, send_config, set_neopixel
 from time import sleep, ticks_ms, ticks_diff
-
 
 # Define allowed cmds
 allowed_cmds = ["EIO", "BIO", "VC", "IC", "CIO", "SIO", "IO", "IOT", "SI", "SE", "GS", "N", "restart"]
@@ -23,6 +23,9 @@ set_led(False)
 # Turn off RGB_BUILTIN
 set_rgb((0,0,0))
 
+# Turn off NEOPIXEL
+set_neopixel(18, 12, (0,0,0))
+
 # Initilize reporting timer
 now = ticks_ms()
 
@@ -31,6 +34,9 @@ write_uart(f"RR")
 
 # Send first report
 cmdReport = True
+
+# TESTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+#set_io(8, True)
 
 while 1:
     
@@ -65,19 +71,23 @@ while 1:
                 
             elif c[0] == "CIO": #Ex: CIO 1,1,1,1,5,5,5,5,5,5,5,2,2,2
                 write_uart(f"{c[0]} {c[1]}")
-                logger.info(f'Sending CIO')
+                logger.info(f'CIO {c[1]}')
                 
             elif c[0] == "SIO": #Stores current IO point type settings to local storage
-                #store_settings()
+                store_config()
                 logger.info(f'TODO: Settings Stored')
                 
             elif c[0] == "IO": #Sets an IO point. Ex: IO [#] [0/1]
-                set_io(int(c[1]), bool(int(c[2])))
+                if int(c[1]) == 18:
+                    set_neopixel(18, 12, (255*int(c[2]),255*int(c[2]),255*int(c[2])))
+                else:
+                    set_io(int(c[1]), bool(int(c[2])))
                 # Send report
                 cmdReport = True
                 logger.debug(f'IO {c[1]} set to {c[2]}')
                 
             elif c[0] == "IOT": #Outputs the current IO Point types pattern as a single string of integers
+                send_config()
                 write_uart(f"IT:2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,")
                 logger.info(f'IOT')
                 
@@ -89,11 +99,9 @@ while 1:
                 logger.info(f'SE')
                 
             elif c[0] == "GS": #Will force an IO status report
-                report = create_report()
-                logger.info(f'{report}')
-                send_report(report)
-                # Reset timer
-                now = ticks_ms()
+                # Send report
+                cmdReport = True
+                logger.debug(f'cmdReport')
                 
             elif c[0] == "N": #NOT a printer
                 write_uart("//action:disconnect")
